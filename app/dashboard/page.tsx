@@ -176,10 +176,21 @@ export default function Dashboard() {
             <ChefHat className="text-orange-600" />
             {t.title}
           </h1>
-          <div className="flex gap-2">
-            <button onClick={() => setLang("tr")} className={`px-3 py-1 rounded-lg border ${lang === 'tr' ? 'bg-orange-100 border-orange-500 text-orange-700' : 'bg-gray-100'}`}>TR</button>
-            <button onClick={() => setLang("de")} className={`px-3 py-1 rounded-lg border ${lang === 'de' ? 'bg-orange-100 border-orange-500 text-orange-700' : 'bg-gray-100'}`}>DE</button>
-            <button onClick={() => setLang("pa")} className={`px-3 py-1 rounded-lg border font-gurmukhi ${lang === 'pa' ? 'bg-orange-100 border-orange-500 text-orange-700' : 'bg-gray-100'}`}>ਪੰਜਾਬੀ</button>
+          {/* Dil Seçici */}
+          <div className="flex gap-2 bg-gray-800 rounded-lg p-1 border border-gray-700">
+            {(["tr", "de", "pa"] as LangCode[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className={`px-4 py-2 rounded-md font-bold transition-all ${
+                  lang === l
+                    ? "bg-orange-600 text-white shadow-lg scale-105" // Seçili: Turuncu, Parlak
+                    : "bg-gray-700 text-gray-200 hover:bg-gray-600 hover:text-white" // Seçili Değil: Açık Gri yazı, Koyu Gri Fon
+                }`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
 
