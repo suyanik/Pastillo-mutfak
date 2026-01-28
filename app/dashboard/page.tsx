@@ -6,7 +6,8 @@ import {
   collection, addDoc, onSnapshot, query, orderBy,
   updateDoc, deleteDoc, doc, serverTimestamp, Timestamp
 } from "firebase/firestore";
-import { ShoppingBasket, Trash2, Check, ChefHat, UserCircle } from "lucide-react";
+import { ShoppingBasket, Trash2, Check, ChefHat, UserCircle, FileText } from "lucide-react";
+import Link from "next/link";
 
 // --- DİL VE ÇEVİRİ AYARLARI ---
 type LangCode = "tr" | "de" | "pa";
@@ -14,6 +15,7 @@ type LangCode = "tr" | "de" | "pa";
 const DICTIONARY = {
   tr: {
     title: "Pastillo Mutfak",
+    reports: "Raporlar",
     add: "Listeye Ekle",
     translating: "Çeviriliyor...",
     placeholder: "Ürün adı... (Örn: Domates)",
@@ -36,6 +38,7 @@ const DICTIONARY = {
   },
   de: {
     title: "Pastillo Küche",
+    reports: "Berichte",
     add: "Hinzufügen",
     translating: "Übersetzen...",
     placeholder: "Produktname... (z.B. Tomaten)",
@@ -58,6 +61,7 @@ const DICTIONARY = {
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ",
+    reports: "ਰਿਪੋਰਟਾਂ",
     add: "ਸ਼ਾਮਲ ਕਰੋ",
     translating: "ਅਨੁਵਾਦ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
     placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
@@ -176,8 +180,18 @@ export default function Dashboard() {
             <ChefHat className="text-orange-600" />
             {t.title}
           </h1>
-          {/* Dil Seçici */}
-          <div className="flex gap-2 bg-gray-800 rounded-lg p-1 border border-gray-700">
+
+          <div className="flex items-center gap-3">
+            {/* Raporlar Butonu */}
+            <Link href="/reports">
+              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                <FileText className="w-4 h-4" />
+                {t.reports}
+              </button>
+            </Link>
+
+            {/* Dil Seçici */}
+            <div className="flex gap-2 bg-gray-800 rounded-lg p-1 border border-gray-700">
             {(["tr", "de", "pa"] as LangCode[]).map((l) => (
               <button
                 key={l}
@@ -191,6 +205,7 @@ export default function Dashboard() {
                 {l.toUpperCase()}
               </button>
             ))}
+          </div>
           </div>
         </div>
 
