@@ -98,7 +98,7 @@ export default function Dashboard() {
   // Data State
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [translating, setTranslating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
@@ -111,47 +111,76 @@ export default function Dashboard() {
 
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.trim()) return;
+    // Eğer kutu boşsa veya şu an zaten gönderiyorsak dur.
+    if (!newItem.trim() || isSubmitting) return;
+
+    setIsSubmitting(true); // Butona tekrar basılmasını engelle
+
+    // 1. Değerleri hafızaya al
+    const itemToAdd = newItem;
+    const currentLang = lang;
+    const currentCat = category;
+    const currentAmount = amount;
+    const currentUnit = unit;
+    const currentRequester = requester;
+
+    // 2. FORMU ANINDA TEMİZLE (Hız hissi için kritik)
+    setNewItem("");
+    // İstersen miktarı da 1'e çekebilirsin: setAmount("1");
 
     try {
-      setTranslating(true);
-
-      // Gemini AI ile çeviri yap
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: newItem,
-          inputLang: lang
-        })
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Çeviri başarısız');
-      }
-
-      // Çevirilerle birlikte Firebase'e kaydet
-      await addDoc(collection(db, "products"), {
-        originalName: newItem,
-        inputLang: lang,
-        names: data.translations, // AI'dan gelen 3 dil
-        category,
-        amount,
-        unit,
-        requester, // KİM İSTEDİ
+      // 3. Veritabanına "Çevirisiz" Halini Hemen Yaz
+      // Böylece ekranda anında görünür.
+      const docRef = await addDoc(collection(db, "products"), {
+        originalName: itemToAdd,
+        inputLang: currentLang,
+        names: {
+            // Başlangıçta hepsine orijinal ismi yazıyoruz, boş görünmesin
+            tr: itemToAdd,
+            de: itemToAdd,
+            pa: itemToAdd
+        },
+        category: currentCat,
+        amount: currentAmount,
+        unit: currentUnit,
+        requester: currentRequester,
         isBought: false,
         createdAt: serverTimestamp(),
-        boughtAt: null // Başlangıçta satın alınma tarihi yok
+        boughtAt: null,
+        isTranslating: true // Ekrana "Çeviriliyor..." yazmak için işaret
       });
 
-      setNewItem("");
+      // 4. KİLİDİ AÇ (Kullanıcı hemen 2. ürünü girebilir)
+      setIsSubmitting(false);
+
+      // 5. ÇEVİRİYİ ARKADA YAP (Kullanıcıyı Bekletme!)
+      fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productName: itemToAdd, inputLang: currentLang })
+      })
+      .then(res => res.json())
+      .then(data => {
+          // Çeviri bitince gidip o satırı sessizce güncelle
+          if (data.success) {
+            updateDoc(doc(db, "products", docRef.id), {
+                names: data.translations,
+                isTranslating: false
+            });
+          }
+      })
+      .catch(err => {
+        console.error("Arka plan çevirisi başarısız:", err);
+        // Hata olsa bile isTranslating'i false yap
+        updateDoc(doc(db, "products", docRef.id), {
+            isTranslating: false
+        });
+      });
+
     } catch (error) {
-      console.error('Ürün ekleme hatası:', error);
-      alert('Ürün eklenirken hata oluştu. Lütfen tekrar deneyin.');
-    } finally {
-      setTranslating(false);
+      console.error("Hata:", error);
+      setIsSubmitting(false); // Hata olursa kilidi aç
+      alert("Bir hata oldu, interneti kontrol et.");
     }
   };
 
@@ -256,7 +285,7 @@ export default function Dashboard() {
                 value={newItem}
                 onChange={(e) => setNewItem(e.target.value)}
                 placeholder={t.placeholder}
-                disabled={translating}
+                disabled={isSubmitting}
                 className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg text-black disabled:opacity-50"
               />
             </div>
@@ -266,26 +295,25 @@ export default function Dashboard() {
                  type="number"
                  value={amount}
                  onChange={(e) => setAmount(e.target.value)}
-                 disabled={translating}
+                 disabled={isSubmitting}
                  className="w-20 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black disabled:opacity-50"
                />
                <select
                  value={unit}
                  onChange={(e) => setUnit(e.target.value)}
-                 disabled={translating}
+                 disabled={isSubmitting}
                  className="flex-1 p-3 bg-gray-50 border rounded-xl text-black disabled:opacity-50"
                >
                  {['kg', 'pcs', 'box', 'pack', 'bag'].map(u => <option key={u} value={u}>{t[`unit_${u}` as keyof typeof t]}</option>)}
                </select>
                <button
                  type="submit"
-                 disabled={translating || !newItem.trim()}
+                 disabled={isSubmitting || !newItem.trim()}
                  className="bg-green-600 text-white px-6 rounded-xl font-bold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                >
-                 {translating ? (
+                 {isSubmitting ? (
                    <>
                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                     <span className="sr-only">{t.translating}</span>
                    </>
                  ) : (
                    "+"
@@ -317,6 +345,9 @@ export default function Dashboard() {
                   <div>
                     <h3 className={`text-lg font-medium ${item.isBought ? "line-through text-gray-500" : "text-gray-900"}`}>
                       {item.names?.[lang] || item.originalName}
+                      {item.isTranslating && (
+                        <span className="ml-2 text-xs text-orange-500 italic">✨ Çeviriliyor...</span>
+                      )}
                     </h3>
                     <p className="text-xs text-gray-400 flex gap-2 items-center mt-1">
                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold uppercase text-[10px]">
