@@ -1,37 +1,33 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Pastillo Mutfak",
-  description: "AI-Powered Multilingual Kitchen Management System",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Pastillo Mutfak",
-  },
-  icons: {
-    icon: "/icon-192x192.png",
-    apple: "/icon-192x192.png",
-  },
-};
-
+// 1. VIEWPORT AYARI (Telefonda zoom yapmayı engeller, "Uygulama" hissi verir)
 export const viewport: Viewport = {
+  themeColor: "#ea580c", // Turuncu (Marka rengimiz)
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#ea580c",
+  userScalable: false, // Kullanıcının elle zoom yapmasını engeller
+};
+
+// 2. METADATA AYARI (PWA ve Kimlik Bilgileri)
+export const metadata: Metadata = {
+  title: "Pastillo Mutfak",
+  description: "Global Mutfak Yönetimi",
+  manifest: "/manifest.json", // Kimlik kartımız burada
+  icons: {
+    icon: "/icon-192x192.png",
+    shortcut: "/icon-192x192.png",
+    apple: "/icon-512x512.png", // iPhone'lar bu ikonu kullanır
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pastillo",
+  },
 };
 
 export default function RootLayout({
@@ -41,18 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
-      <head>
-        {/* Apple PWA Tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Pastillo" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512x512.png" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={inter.className}>
         {children}
       </body>
     </html>
