@@ -345,9 +345,8 @@ export default function Dashboard() {
                   <div>
                     <h3 className={`text-lg font-medium ${item.isBought ? "line-through text-gray-500" : "text-gray-900"}`}>
                       {item.names?.[lang] || item.originalName}
-                      {item.isTranslating && (
-                        <span className="ml-2 text-xs text-orange-500 italic">✨ Çeviriliyor...</span>
-                      )}
+                      {/* Eğer hala çeviriliyorsa kum saati veya dönen ikon koy */}
+                      {item.isTranslating && <span className="text-xs text-orange-500 ml-2 animate-pulse">(Çeviriliyor...)</span>}
                     </h3>
                     <p className="text-xs text-gray-400 flex gap-2 items-center mt-1">
                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold uppercase text-[10px]">
