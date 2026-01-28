@@ -88,7 +88,6 @@ export default function Dashboard() {
   const [amount, setAmount] = useState("1");
   const [unit, setUnit] = useState("kg");
   const [requester, setRequester] = useState("chef");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Data State
   const [items, setItems] = useState<any[]>([]); // TÜM ÜRÜNLER (Arşiv dahil)
@@ -120,13 +119,13 @@ export default function Dashboard() {
     return Array.from(names).slice(0, 20); // İlk 20 öneri
   }, [items, lang]);
 
-  // Hızlı Ekleme Fonksiyonu
+  // Hızlı Ekleme Fonksiyonu (Kilitsiz - Non-Blocking)
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.trim() || isSubmitting) return;
+    // Kilit kontrolünü kaldırdık - Tam Non-Blocking!
+    if (!newItem.trim()) return;
 
-    setIsSubmitting(true);
-
+    // 1. Değerleri hafızaya al
     const itemToAdd = newItem;
     const currentData = {
         lang,
@@ -136,11 +135,13 @@ export default function Dashboard() {
         req: requester
     };
 
-    setNewItem(""); // Formu hemen temizle
+    // 2. ARAYÜZÜ ANINDA BOŞALT (Kullanıcı hemen yenisini yazabilsin)
+    setNewItem("");
+    // İstersen miktarı 1'e çek: setAmount("1");
 
     try {
-      // Veritabanına Ekle
-      const docRef = await addDoc(collection(db, "products"), {
+      // 3. Veritabanı işlemini başlat (Ama bekleme, kullanıcı devam etsin)
+      addDoc(collection(db, "products"), {
         originalName: itemToAdd,
         inputLang: currentData.lang,
         names: { tr: itemToAdd, de: itemToAdd, pa: itemToAdd },
@@ -149,40 +150,32 @@ export default function Dashboard() {
         unit: currentData.unit,
         requester: currentData.req,
         isBought: false,
-        isArchived: false, // Yeni ürünler arşivli değil
+        isArchived: false,
         createdAt: serverTimestamp(),
         boughtAt: null,
         isTranslating: true
-      });
-
-      setIsSubmitting(false);
-
-      // Arka Planda Çeviri
-      fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productName: itemToAdd, inputLang: currentData.lang })
-      })
-      .then(res => res.json())
-      .then(data => {
-          if (data.success) {
-            updateDoc(doc(db, "products", docRef.id), {
-                names: data.translations,
-                isTranslating: false
-            });
-          }
-      })
-      .catch(err => {
-        console.error("Çeviri hatası:", err);
-        updateDoc(doc(db, "products", docRef.id), {
-            isTranslating: false
-        });
+      }).then((docRef) => {
+          // 4. Kayıt başarılı olunca arka planda çeviriyi başlat
+          fetch('/api/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productName: itemToAdd, inputLang: currentData.lang })
+          })
+          .then(res => res.json())
+          .then(data => {
+              if (data.success) {
+                updateDoc(doc(db, "products", docRef.id), {
+                    names: data.translations,
+                    isTranslating: false
+                });
+              }
+          })
+          .catch(err => console.error("Çeviri hatası:", err));
       });
 
     } catch (error) {
       console.error("Hata:", error);
-      setIsSubmitting(false);
-      alert("Bir hata oldu, interneti kontrol et.");
+      alert("Bir hata oldu, son eklediğin gitmemiş olabilir.");
     }
   };
 
@@ -295,8 +288,7 @@ export default function Dashboard() {
                 onChange={(e) => setNewItem(e.target.value)}
                 placeholder={t.placeholder}
                 list="product-suggestions"
-                disabled={isSubmitting}
-                className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg text-black disabled:opacity-50"
+                className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg text-black"
               />
               {/* Datalist ile öneri sistemi */}
               <datalist id="product-suggestions">
@@ -312,15 +304,13 @@ export default function Dashboard() {
                  type="number"
                  value={amount}
                  onChange={(e) => setAmount(e.target.value)}
-                 disabled={isSubmitting}
-                 className="w-20 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black disabled:opacity-50"
+                 className="w-20 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black"
                  min="1"
                />
                <select
                  value={unit}
                  onChange={(e) => setUnit(e.target.value)}
-                 disabled={isSubmitting}
-                 className="flex-1 p-3 bg-gray-50 border rounded-xl text-black disabled:opacity-50"
+                 className="flex-1 p-3 bg-gray-50 border rounded-xl text-black"
                >
                  {['kg', 'pcs', 'box', 'pack', 'bag'].map(u =>
                    <option key={u} value={u}>{t[`unit_${u}` as keyof typeof t]}</option>
@@ -328,14 +318,10 @@ export default function Dashboard() {
                </select>
                <button
                  type="submit"
-                 disabled={isSubmitting || !newItem.trim()}
-                 className="bg-green-600 text-white px-6 rounded-xl font-bold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                 disabled={!newItem.trim()}
+                 className="bg-green-600 text-white px-6 rounded-xl font-bold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                >
-                 {isSubmitting ? (
-                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                 ) : (
-                   "+"
-                 )}
+                 +
                </button>
             </div>
           </form>
