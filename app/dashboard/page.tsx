@@ -12,13 +12,14 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 
 type LangCode = "tr" | "de" | "pa";
 
-const SUPPLIERS = [
-  { id: "metro", name: "Metro" },
-  { id: "hal", name: "Hal (Sebze)" },
-  { id: "kasap", name: "Kasap" },
-  { id: "drink", name: "İçecekçi" },
-  { id: "other", name: "Diğer" }
-];
+// Tedarikçiler (Çok Dilli)
+const SUPPLIERS: Record<string, { tr: string; de: string; pa: string }> = {
+  metro: { tr: "Metro", de: "Metro", pa: "ਮੈਟਰੋ" },
+  hal: { tr: "Hal (Sebze)", de: "Markt (Gemüse)", pa: "ਮੰਡੀ (ਸਬਜ਼ੀ)" },
+  kasap: { tr: "Kasap", de: "Metzger", pa: "ਕਸਾਈ" },
+  drink: { tr: "İçecekçi", de: "Getränkehändler", pa: "ਪੀਣ ਵਾਲੇ ਵਾਲਾ" },
+  other: { tr: "Diğer", de: "Andere", pa: "ਹੋਰ" }
+};
 
 // Başlangıç için varsayılanlar (Veritabanı boşsa bunlar yüklenecek)
 const DEFAULT_CATALOG = [
@@ -35,7 +36,8 @@ const DICTIONARY = {
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
     total_est: "Tahmini", save_catalog: "Kataloğa Kaydet", edit_mode: "Butonları Düzenle",
     reports: "Raporlar", completed: "Tamamlananlar", show: "Göster", hide: "Gizle",
-    scan_barcode: "Barkod Tara", scanning: "Taranıyor...", scan_success: "Barkod bulundu!"
+    scan_barcode: "Barkod Tara", scanning: "Taranıyor...", scan_success: "Barkod bulundu!",
+    no_items_category: "Bu kategoride kayıtlı buton yok.", quick_select: "Hızlı Seçim", done: "Bitti"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Produktname...",
@@ -43,7 +45,8 @@ const DICTIONARY = {
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
     total_est: "Summe", save_catalog: "In Katalog speichern", edit_mode: "Buttons bearbeiten",
     reports: "Berichte", completed: "Fertig", show: "Zeigen", hide: "Verstecken",
-    scan_barcode: "Barcode scannen", scanning: "Scannt...", scan_success: "Barcode gefunden!"
+    scan_barcode: "Barcode scannen", scanning: "Scannt...", scan_success: "Barcode gefunden!",
+    no_items_category: "Keine Buttons in dieser Kategorie.", quick_select: "Schnellauswahl", done: "Fertig"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
@@ -51,7 +54,8 @@ const DICTIONARY = {
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
     total_est: "ਕੁੱਲ", save_catalog: "ਕੈਟਾਲਾਗ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਬਟਨ ਸੰਪਾਦਿਤ ਕਰੋ",
     reports: "ਰਿਪੋਰਟਾਂ", completed: "ਪੂਰਾ ਹੋਇਆ", show: "ਦਿਖਾਓ", hide: "ਲੁਕਾਓ",
-    scan_barcode: "ਬਾਰਕੋਡ ਸਕੈਨ ਕਰੋ", scanning: "ਸਕੈਨਿੰਗ...", scan_success: "ਬਾਰਕੋਡ ਮਿਲਿਆ!"
+    scan_barcode: "ਬਾਰਕੋਡ ਸਕੈਨ ਕਰੋ", scanning: "ਸਕੈਨਿੰਗ...", scan_success: "ਬਾਰਕੋਡ ਮਿਲਿਆ!",
+    no_items_category: "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਬਟਨ ਨਹੀਂ।", quick_select: "ਤੇਜ਼ ਚੋਣ", done: "ਹੋ ਗਿਆ"
   }
 };
 
@@ -120,12 +124,13 @@ export default function Dashboard() {
   }, [visibleItems]);
 
   const sendToWhatsapp = (supplierId: string) => {
-    const supplierName = SUPPLIERS.find(s => s.id === supplierId)?.name || supplierId;
+    const supplierName = SUPPLIERS[supplierId]?.[lang] || supplierId;
     const productList = itemsBySupplier[supplierId];
     if (!productList?.length) return;
     let message = `🛒 *Pastillo - ${supplierName}*\n\n`;
     productList.forEach(item => {
-      message += `- ${item.amount} ${item.unit} ${item.names?.[lang] || item.originalName}\n`;
+      const unitText = t[`unit_${item.unit}` as keyof typeof t] || item.unit;
+      message += `- ${item.amount} ${unitText} ${item.names?.[lang] || item.originalName}\n`;
     });
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -298,7 +303,7 @@ export default function Dashboard() {
               <button key={supId} onClick={() => sendToWhatsapp(supId)}
                 className="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm whitespace-nowrap active:scale-95 transition-transform hover:bg-green-700">
                 <Send className="w-3 h-3" />
-                {SUPPLIERS.find(s => s.id === supId)?.name} ({itemsBySupplier[supId].length})
+                {SUPPLIERS[supId]?.[lang] || supId} ({itemsBySupplier[supId].length})
               </button>
             ))}
           </div>
@@ -320,9 +325,9 @@ export default function Dashboard() {
           {/* KATALOG (BUTONLAR) */}
           <div className="p-3 bg-blue-50/50">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-xs text-blue-400 font-bold uppercase tracking-wider">Hızlı Seçim</span>
+              <span className="text-xs text-blue-400 font-bold uppercase tracking-wider">{t.quick_select}</span>
               <button onClick={() => setIsEditMode(!isEditMode)} className={`text-xs flex items-center gap-1 px-2 py-1 rounded border ${isEditMode ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}>
-                {isEditMode ? 'Bitti' : <Edit className="w-3 h-3" />}
+                {isEditMode ? t.done : <Edit className="w-3 h-3" />}
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -341,7 +346,7 @@ export default function Dashboard() {
                   )}
                 </div>
               ))}
-              {currentCatalog.length === 0 && <span className="text-xs text-gray-400 italic">Bu kategoride kayıtlı buton yok.</span>}
+              {currentCatalog.length === 0 && <span className="text-xs text-gray-400 italic">{t.no_items_category}</span>}
             </div>
           </div>
 
@@ -372,7 +377,7 @@ export default function Dashboard() {
                   <span className="absolute left-2 top-2 text-green-600">€</span>
                 </div>
                 <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="flex-1 p-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-xs font-bold">
-                  {SUPPLIERS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {Object.keys(SUPPLIERS).map(supId => <option key={supId} value={supId}>{SUPPLIERS[supId][lang]}</option>)}
                 </select>
               </div>
             </div>
@@ -415,10 +420,10 @@ export default function Dashboard() {
                       {item.names?.[lang] || item.originalName}
                     </h3>
                     <div className="text-[11px] text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">
-                      <span className="font-bold text-gray-700">{item.amount} {item.unit}</span>
+                      <span className="font-bold text-gray-700">{item.amount} {t[`unit_${item.unit}` as keyof typeof t] || item.unit}</span>
                       <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
                         <Truck className="w-3 h-3" />
-                        {SUPPLIERS.find(s => s.id === item.supplier)?.name || item.supplier}
+                        {SUPPLIERS[item.supplier]?.[lang] || item.supplier}
                       </span>
                       {item.estimatedPrice > 0 && <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold">{item.estimatedPrice} €</span>}
                     </div>
@@ -453,7 +458,7 @@ export default function Dashboard() {
                             {item.names?.[lang] || item.originalName}
                           </h3>
                           <div className="text-[11px] text-gray-400 flex flex-wrap gap-2 items-center mt-0.5">
-                            <span className="font-bold">{item.amount} {item.unit}</span>
+                            <span className="font-bold">{item.amount} {t[`unit_${item.unit}` as keyof typeof t] || item.unit}</span>
                             {item.estimatedPrice > 0 && <span className="font-bold">{item.estimatedPrice} €</span>}
                           </div>
                         </div>
