@@ -155,25 +155,25 @@ export default function Reports() {
   const fetchReports = async () => {
     setLoading(true);
     try {
-      let q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      // TÜM ÜRÜNLERİ ÇEK (Arşivlenmiş dahil - Raporlarda hepsi görünmeli)
+      const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      let allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ReportItem[];
 
-      // Aylık filtreleme
+      // ✅ CLIENT-SIDE FİLTRELEME (Daha hızlı - tek sorgu)
       if (selectedMonth !== "all") {
         const [year, month] = selectedMonth.split("-");
         const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
         const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
-        q = query(
-          collection(db, "products"),
-          where("createdAt", ">=", Timestamp.fromDate(startDate)),
-          where("createdAt", "<=", Timestamp.fromDate(endDate)),
-          orderBy("createdAt", "desc")
-        );
+        allItems = allItems.filter(item => {
+          if (!item.createdAt) return false;
+          const itemDate = item.createdAt.toDate();
+          return itemDate >= startDate && itemDate <= endDate;
+        });
       }
 
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ReportItem[];
-      setItems(data);
+      setItems(allItems);
     } catch (error) {
       console.error("Rapor yükleme hatası:", error);
     } finally {
