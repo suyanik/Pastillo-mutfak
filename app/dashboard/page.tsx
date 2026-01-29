@@ -217,9 +217,15 @@ export default function Dashboard() {
 
             {/* A) KATEGORİ SEÇİMİ (Tab Bar) */}
             <div className="flex gap-2 overflow-x-auto p-3 bg-gray-50 border-b scrollbar-hide">
-              {[{ id: "veg", icon: "🥦" }, { id: "meat", icon: "🥩" }, { id: "metro", icon: "🛒" }, { id: "drink", icon: "🥤" }]
+              {[{ id: "veg", icon: "🥦", defaultSup: "hal" }, { id: "meat", icon: "🥩", defaultSup: "kasap" }, { id: "metro", icon: "🛒", defaultSup: "metro" }, { id: "drink", icon: "🥤", defaultSup: "drink" }]
               .map((cat) => (
-                <button key={cat.id} type="button" onClick={() => {setCategory(cat.id); setPreSelected(null); setNewItem("");}}
+                <button key={cat.id} type="button"
+                    onClick={() => {
+                        setCategory(cat.id);
+                        setPreSelected(null);
+                        setNewItem("");
+                        setSupplier(cat.defaultSup); // BU SATIR EKLENDİ
+                    }}
                     className={`flex items-center gap-1 px-4 py-3 rounded-xl whitespace-nowrap text-sm font-bold transition-all flex-1 justify-center
                     ${category === cat.id ? "bg-orange-600 text-white shadow-md transform scale-105" : "bg-white text-gray-500 border hover:bg-gray-50"}`}>
                   <span className="text-lg">{cat.icon}</span>
