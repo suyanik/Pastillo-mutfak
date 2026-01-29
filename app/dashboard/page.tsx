@@ -6,20 +6,20 @@ import {
   collection, addDoc, onSnapshot, query, orderBy,
   updateDoc, deleteDoc, doc, serverTimestamp
 } from "firebase/firestore";
-import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, LayoutGrid, PlusCircle, FileText } from "lucide-react";
-import Link from "next/link";
+import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, LayoutGrid, PlusCircle } from "lucide-react";
 
 type LangCode = "tr" | "de" | "pa";
 
-const SUPPLIERS: Record<string, { tr: string; de: string; pa: string }> = {
-  metro: { tr: "Metro", de: "Metro", pa: "ਮੈਟਰੋ" },
-  hal: { tr: "Hal (Sebze)", de: "Markt (Gemüse)", pa: "ਮੰਡੀ (ਸਬਜ਼ੀ)" },
-  kasap: { tr: "Kasap", de: "Metzger", pa: "ਕਸਾਈ" },
-  drink: { tr: "İçecekçi", de: "Getränkehändler", pa: "ਪੀਣ ਵਾਲੇ ਵੇਚਣ ਵਾਲਾ" },
-  other: { tr: "Diğer", de: "Andere", pa: "ਹੋਰ" }
-};
+// --- SABİT VERİLER ---
+const SUPPLIERS = [
+  { id: "metro", name: "Metro" },
+  { id: "hal", name: "Hal (Sebze)" },
+  { id: "kasap", name: "Kasap" },
+  { id: "drink", name: "İçecekçi" },
+  { id: "other", name: "Diğer" }
+];
 
-// Varsayılan Katalog (Sistem boşsa bunlar yüklenecek)
+// Varsayılan Katalog (Sistem boşsa yüklenecekler)
 const DEFAULT_CATALOG = [
   { category: "veg", tr: "Domates", de: "Tomaten", pa: "ਟਮਾਟਰ", defaultPrice: 2.5, defaultSupplier: "hal" },
   { category: "veg", tr: "Soğan", de: "Zwiebeln", pa: "ਪਿਆਜ਼", defaultPrice: 1.2, defaultSupplier: "hal" },
@@ -32,28 +32,22 @@ const DICTIONARY = {
     title: "Pastillo Mutfak", placeholder: "Yeni ürün yaz veya yukarıdan seç...",
     unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
-    save_catalog: "Bunu rafa kaydet (Buton yap)", edit_mode: "Düzenle", quick_select: "Raf Seçimi",
-    add_btn: "LİSTEYE EKLE", reports: "Raporlar", done: "Bitti",
-    empty_shelf: "Bu rafta ürün yok.", empty_shelf_hint: "Aşağıdan ekleyip \"Kaydet\"e bas.",
-    confirm_delete: "Bu kartı raftan kaldırmak istiyor musun?"
+    save_catalog: "Bunu rafa kaydet", edit_mode: "Düzenle", quick_select: "Raf Seçimi",
+    add_btn: "LİSTEYE EKLE"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Neues Produkt...",
     unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
     save_catalog: "Im Regal speichern", edit_mode: "Bearbeiten", quick_select: "Regal",
-    add_btn: "HINZUFÜGEN", reports: "Berichte", done: "Fertig",
-    empty_shelf: "Keine Produkte im Regal.", empty_shelf_hint: "Unten hinzufügen und \"Speichern\" drücken.",
-    confirm_delete: "Möchten Sie diese Karte aus dem Regal entfernen?"
+    add_btn: "HINZUFÜGEN"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਨਵਾਂ ਉਤਪਾਦ...",
     unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
     save_catalog: "ਸ਼ੈਲਫ 'ਤੇ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਸੰਪਾਦਿਤ ਕਰੋ", quick_select: "ਸ਼ੈਲਫ",
-    add_btn: "ਜੋੜੋ", reports: "ਰਿਪੋਰਟਾਂ", done: "ਹੋ ਗਿਆ",
-    empty_shelf: "ਇਸ ਸ਼ੈਲਫ ਵਿੱਚ ਕੋਈ ਉਤਪਾਦ ਨਹੀਂ।", empty_shelf_hint: "ਹੇਠਾਂ ਤੋਂ ਜੋੜੋ ਅਤੇ \"ਸੁਰੱਖਿਅਤ\" ਦਬਾਓ।",
-    confirm_delete: "ਕੀ ਤੁਸੀਂ ਇਸ ਕਾਰਡ ਨੂੰ ਸ਼ੈਲਫ ਤੋਂ ਹਟਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?"
+    add_btn: "ਜੋੜੋ"
   }
 };
 
@@ -68,9 +62,11 @@ export default function Dashboard() {
   const [unit, setUnit] = useState("kg");
   const [requester, setRequester] = useState("chef");
   const [price, setPrice] = useState("");
-  const [supplier, setSupplier] = useState("metro");
+  const [supplier, setSupplier] = useState("hal"); // Başlangıçta sebze olduğu için Hal
 
-  const [saveToCatalog, setSaveToCatalog] = useState(false);
+  // 🔥 DÜZELTME: Başlangıçta TRUE olsun, unutulursa bile kaydetsin
+  const [saveToCatalog, setSaveToCatalog] = useState(true);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [preSelected, setPreSelected] = useState<any>(null);
 
@@ -99,7 +95,7 @@ export default function Dashboard() {
   const totalCost = useMemo(() => visibleItems.reduce((acc, item) => acc + (Number(item.estimatedPrice) || 0), 0), [visibleItems]);
   const currentCatalog = catalogItems.filter(i => i.category === category);
 
-  // WhatsApp
+  // WhatsApp Gruplama
   const itemsBySupplier = useMemo(() => {
     const groups: Record<string, any[]> = {};
     visibleItems.filter(i => !i.isBought).forEach(item => {
@@ -111,14 +107,11 @@ export default function Dashboard() {
   }, [visibleItems]);
 
   const sendToWhatsapp = (supplierId: string) => {
-    const supplierName = SUPPLIERS[supplierId]?.[lang] || supplierId;
+    const supplierName = SUPPLIERS.find(s => s.id === supplierId)?.name || supplierId;
     const productList = itemsBySupplier[supplierId];
     if(!productList?.length) return;
     let message = `🛒 *Pastillo - ${supplierName}*\n\n`;
-    productList.forEach(item => {
-      const unitText = t[`unit_${item.unit}` as keyof typeof t] || item.unit;
-      message += `- ${item.amount} ${unitText} ${item.names?.[lang] || item.originalName}\n`;
-    });
+    productList.forEach(item => message += `- ${item.amount} ${item.unit} ${item.names?.[lang] || item.originalName}\n`);
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -133,7 +126,7 @@ export default function Dashboard() {
   };
 
   const deleteFromCatalog = async (id: string) => {
-      if(confirm(t.confirm_delete)) await deleteDoc(doc(db, "catalog", id));
+      if(confirm("Bu kartı raftan kaldırmak istiyor musun?")) await deleteDoc(doc(db, "catalog", id));
   };
 
   const addItem = async (e: React.FormEvent) => {
@@ -141,6 +134,7 @@ export default function Dashboard() {
     if (!newItem.trim()) return;
 
     const itemToAdd = newItem;
+    // İsimler (Geçici olarak hepsi aynı, çeviri gelince düzelir)
     let names = preSelected ? preSelected : { tr: itemToAdd, de: itemToAdd, pa: itemToAdd };
     const cleanNames = { tr: names.tr || itemToAdd, de: names.de || itemToAdd, pa: names.pa || itemToAdd };
 
@@ -149,9 +143,11 @@ export default function Dashboard() {
         price: parseFloat(price) || 0, sup: supplier, save: saveToCatalog
     };
 
-    setNewItem(""); setPrice(""); setPreSelected(null); setSaveToCatalog(false);
+    // Formu Temizle
+    setNewItem(""); setPrice(""); setPreSelected(null); setSaveToCatalog(true); // Bir sonrakine yine hazır olsun
 
-    const docRef = await addDoc(collection(db, "products"), {
+    // 1. Ürün Listesine Ekle (ANINDA)
+    const productRef = await addDoc(collection(db, "products"), {
       originalName: itemToAdd, names: cleanNames, category: currentData.cat,
       amount: currentData.amt, unit: currentData.unit, requester: currentData.req,
       estimatedPrice: currentData.price, supplier: currentData.sup,
@@ -159,17 +155,30 @@ export default function Dashboard() {
       isTranslating: !currentData.isPre
     });
 
+    // 2. Kataloğa (Rafa) Ekle (ANINDA - Çeviri beklemeden)
+    let catalogRefId = null;
+    if (currentData.save && !currentData.isPre) {
+        const catRef = await addDoc(collection(db, "catalog"), {
+            category: currentData.cat, defaultPrice: currentData.price, defaultSupplier: currentData.sup,
+            tr: itemToAdd, de: itemToAdd, pa: itemToAdd // Geçici isimler
+        });
+        catalogRefId = catRef.id;
+    }
+
+    // 3. Arka Planda Çeviriyi Başlat
     if (!currentData.isPre) {
        fetch('/api/translate', { method: 'POST', body: JSON.stringify({ productName: itemToAdd, inputLang: currentData.lang }) })
         .then(res => res.json())
         .then(async (translatedNames) => {
-            await updateDoc(doc(db, "products", docRef.id), { names: translatedNames, isTranslating: false });
-            if (currentData.save) {
-                await addDoc(collection(db, "catalog"), {
-                    category: currentData.cat, defaultPrice: currentData.price, defaultSupplier: currentData.sup, ...translatedNames
-                });
+            // A) Listedeki ürünü güncelle
+            await updateDoc(doc(db, "products", productRef.id), { names: translatedNames, isTranslating: false });
+
+            // B) Eğer rafa koyduysak, raftaki kartı da güncelle (Böylece Almancası da görünür)
+            if (catalogRefId) {
+                await updateDoc(doc(db, "catalog", catalogRefId), translatedNames);
             }
-        });
+        })
+        .catch(err => console.error("Çeviri hatası:", err));
     }
   };
 
@@ -180,32 +189,22 @@ export default function Dashboard() {
     <div className={`min-h-screen bg-gray-50 p-2 sm:p-4 ${lang === 'pa' ? 'font-gurmukhi' : ''}`}>
       <div className="max-w-xl mx-auto space-y-4">
 
-        {/* 1. ÜST PANEL (Başlık & Bütçe & WhatsApp) */}
+        {/* ÜST PANEL */}
         <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
             <div className="flex justify-between items-center">
                 <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <ChefHat className="text-orange-600 w-6 h-6" />
                     {t.title}
                 </h1>
-                <div className="flex items-center gap-2">
-                    {/* Raporlar Butonu */}
-                    <Link href="/reports">
-                        <button className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors">
-                            <FileText className="w-3 h-3" />
-                            {t.reports}
-                        </button>
-                    </Link>
-                    {/* Dil Seçici */}
-                    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                        {(["tr", "de", "pa"] as LangCode[]).map((l) => (
-                        <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
-                            {l.toUpperCase()}
-                        </button>
-                        ))}
-                    </div>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                    {(["tr", "de", "pa"] as LangCode[]).map((l) => (
+                    <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
+                        {l.toUpperCase()}
+                    </button>
+                    ))}
                 </div>
             </div>
-
+            {/* Bütçe ve WhatsApp */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 <div className="bg-green-50 border border-green-100 px-3 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap">
                     <Wallet className="w-4 h-4 text-green-700" />
@@ -215,25 +214,26 @@ export default function Dashboard() {
                     <button key={supId} onClick={() => sendToWhatsapp(supId)}
                         className="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm whitespace-nowrap active:scale-95 transition-transform hover:bg-green-700">
                         <Send className="w-3 h-3" />
-                        {SUPPLIERS[supId]?.[lang] || supId} ({itemsBySupplier[supId].length})
+                        {SUPPLIERS.find(s => s.id === supId)?.name} ({itemsBySupplier[supId].length})
                     </button>
                 ))}
             </div>
         </div>
 
-        {/* 2. ANA KONTROL KARTI */}
+        {/* ANA KONTROL KARTI */}
         <div className="bg-white rounded-xl shadow-lg border-t-4 border-orange-500 overflow-hidden">
 
-            {/* A) KATEGORİ SEÇİMİ (Tab Bar) */}
+            {/* 1. KATEGORİ SEÇİMİ (Tab Bar) - OTOMATİK TEDARİKÇİ AYARI EKLENDİ */}
             <div className="flex gap-2 overflow-x-auto p-3 bg-gray-50 border-b scrollbar-hide">
-              {[{ id: "veg", icon: "🥦", defaultSup: "hal" }, { id: "meat", icon: "🥩", defaultSup: "kasap" }, { id: "metro", icon: "🛒", defaultSup: "metro" }, { id: "drink", icon: "🥤", defaultSup: "drink" }]
+              {[{ id: "veg", icon: "🥦", defSup: "hal" }, { id: "meat", icon: "🥩", defSup: "kasap" }, { id: "metro", icon: "🛒", defSup: "metro" }, { id: "drink", icon: "🥤", defSup: "drink" }]
               .map((cat) => (
                 <button key={cat.id} type="button"
                     onClick={() => {
                         setCategory(cat.id);
                         setPreSelected(null);
                         setNewItem("");
-                        setSupplier(cat.defaultSup); // BU SATIR EKLENDİ
+                        // 🔥 OTOMATİK TEDARİKÇİ GÜNCELLEME
+                        setSupplier(cat.defSup);
                     }}
                     className={`flex items-center gap-1 px-4 py-3 rounded-xl whitespace-nowrap text-sm font-bold transition-all flex-1 justify-center
                     ${category === cat.id ? "bg-orange-600 text-white shadow-md transform scale-105" : "bg-white text-gray-500 border hover:bg-gray-50"}`}>
@@ -243,7 +243,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* B) RAF DÜZENİ (Grid Görünümü) */}
+            {/* 2. RAF DÜZENİ (Grid) */}
             <div className="p-3 bg-blue-50/30 min-h-[140px]">
                 <div className="flex justify-between items-center mb-3 px-1">
                     <span className="text-xs text-blue-500 font-bold uppercase tracking-wider flex items-center gap-1">
@@ -251,7 +251,7 @@ export default function Dashboard() {
                         {t.quick_select} ({currentCatalog.length})
                     </span>
                     <button onClick={() => setIsEditMode(!isEditMode)} className={`text-xs flex items-center gap-1 px-2 py-1 rounded border transition-colors ${isEditMode ? 'bg-red-100 text-red-600 border-red-200 font-bold' : 'bg-white text-gray-400 hover:text-gray-600'}`}>
-                        {isEditMode ? t.done : <Edit className="w-3 h-3" />}
+                        {isEditMode ? 'Bitti' : <Edit className="w-3 h-3" />}
                     </button>
                 </div>
 
@@ -261,21 +261,13 @@ export default function Dashboard() {
                              className={`relative p-3 rounded-xl border cursor-pointer transition-all active:scale-95 group
                              ${preSelected?.id === item.id ? 'bg-blue-100 border-blue-400 ring-1 ring-blue-400' : 'bg-white border-blue-100 hover:border-blue-300 hover:shadow-md'}
                              ${isEditMode ? 'opacity-90 bg-red-50/50' : ''}`}>
-
-                            {/* Ürün İsmi */}
                             <div className="font-bold text-gray-800 text-sm truncate">{item[lang] || item.tr}</div>
-
-                            {/* Alt Bilgi (Tedarikçi ve Fiyat) */}
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded capitalize">
-                                    {SUPPLIERS[item.defaultSupplier]?.[lang] || SUPPLIERS.hal[lang]}
+                                    {SUPPLIERS.find(s => s.id === item.defaultSupplier)?.name || 'Hal'}
                                 </span>
-                                {item.defaultPrice > 0 && (
-                                    <span className="text-[10px] font-bold text-green-700">{item.defaultPrice}€</span>
-                                )}
+                                {item.defaultPrice > 0 && <span className="text-[10px] font-bold text-green-700">{item.defaultPrice}€</span>}
                             </div>
-
-                            {/* Silme İkonu (Sadece Edit Modunda) */}
                             {isEditMode && (
                                 <button onClick={(e) => {e.stopPropagation(); deleteFromCatalog(item.id);}}
                                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg z-10 hover:bg-red-600">
@@ -284,19 +276,12 @@ export default function Dashboard() {
                             )}
                         </div>
                     ))}
-
-                    {/* Boş İse Uyarı */}
-                    {currentCatalog.length === 0 && (
-                        <div className="col-span-2 text-center py-6 text-gray-400 text-xs border-2 border-dashed border-gray-200 rounded-xl">
-                            {t.empty_shelf}<br/>{t.empty_shelf_hint}
-                        </div>
-                    )}
+                    {currentCatalog.length === 0 && <div className="col-span-2 text-center py-6 text-gray-400 text-xs border-2 border-dashed border-gray-200 rounded-xl">Bu rafta ürün yok.</div>}
                 </div>
             </div>
 
             {/* 3. GİRİŞ FORMU */}
             <form onSubmit={addItem} className="p-4 bg-white space-y-3 border-t border-gray-100">
-                {/* İsim Girişi */}
                 <div className="relative">
                     <input type="text" value={newItem} onChange={(e) => {setNewItem(e.target.value); setPreSelected(null);}}
                         placeholder={t.placeholder}
@@ -305,7 +290,6 @@ export default function Dashboard() {
                     {preSelected && <Check className="absolute left-3 top-5 w-5 h-5 text-blue-500" />}
                 </div>
 
-                {/* Detaylar (Miktar, Fiyat, Tedarikçi) */}
                 <div className="grid grid-cols-2 gap-2">
                     <div className="flex gap-2">
                         <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-16 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black text-lg" />
@@ -318,22 +302,17 @@ export default function Dashboard() {
                             <input type="number" step="0.5" placeholder="0" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 pl-6 bg-green-50 border border-green-200 rounded-xl text-green-800 font-bold placeholder-green-300" />
                             <span className="absolute left-2 top-3 text-green-600">€</span>
                         </div>
+                        {/* Tedarikçi Seçimi */}
                         <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="flex-1 p-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-bold">
-                            {Object.keys(SUPPLIERS).map(supId => <option key={supId} value={supId}>{SUPPLIERS[supId][lang]}</option>)}
+                            {SUPPLIERS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                     </div>
                 </div>
 
-                {/* ✨ Rafa Kaydet Checkbox (Sadece elle yazılanlar için) */}
+                {/* ✨ Rafa Kaydet Checkbox (Varsayılan olarak TRUE yaptık) */}
                 {!preSelected && newItem.length > 0 && (
-                    <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-xl border border-orange-100 animate-in fade-in slide-in-from-top-2">
-                        <input
-                            type="checkbox"
-                            id="saveCatalog"
-                            checked={saveToCatalog}
-                            onChange={(e) => setSaveToCatalog(e.target.checked)}
-                            className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500 border-orange-300"
-                        />
+                    <div className="flex items-center gap-2 bg-orange-50 p-3 rounded-xl border border-orange-100">
+                        <input type="checkbox" id="saveCatalog" checked={saveToCatalog} onChange={(e) => setSaveToCatalog(e.target.checked)} className="w-5 h-5 text-orange-600 rounded focus:ring-orange-500 border-orange-300" />
                         <label htmlFor="saveCatalog" className="text-sm font-bold text-orange-800 flex items-center gap-1 cursor-pointer select-none">
                             <Save className="w-4 h-4" />
                             {t.save_catalog}
@@ -341,7 +320,6 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {/* Ekle Butonu */}
                 <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-xl font-black text-lg shadow-md hover:bg-green-700 active:scale-95 transition-all flex items-center justify-center gap-2">
                     {preSelected ? <Check className="w-6 h-6" /> : <PlusCircle className="w-6 h-6" />}
                     {t.add_btn}
@@ -349,23 +327,21 @@ export default function Dashboard() {
             </form>
         </div>
 
-        {/* 3. LİSTE (ALIŞVERİŞ SEPETİ) */}
+        {/* 3. LİSTE */}
         <div className="space-y-2 pb-24">
             {visibleItems.map((item) => (
               <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${item.isBought ? "bg-gray-100 border-gray-100 opacity-60" : "bg-white shadow-sm border-l-4 border-l-orange-500"}`}>
                 <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-3 flex-1 cursor-pointer">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${item.isBought ? "bg-green-500 border-green-500" : "border-gray-300 group-hover:border-orange-500"}`}>
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${item.isBought ? "bg-green-500 border-green-500" : "border-gray-300"}`}>
                     {item.isBought && <Check className="w-4 h-4 text-white" />}
                   </div>
                   <div>
-                    <h3 className={`font-bold text-gray-800 ${item.isBought ? "line-through text-gray-400" : ""}`}>
-                      {item.names?.[lang] || item.originalName}
-                    </h3>
+                    <h3 className={`font-bold text-gray-800 ${item.isBought ? "line-through text-gray-400" : ""}`}>{item.names?.[lang] || item.originalName}</h3>
                     <div className="text-[11px] text-gray-500 flex flex-wrap gap-2 items-center mt-1">
-                       <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{item.amount} {t[`unit_${item.unit}` as keyof typeof t] || item.unit}</span>
+                       <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{item.amount} {item.unit}</span>
                        <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
                            <Truck className="w-3 h-3" />
-                           {SUPPLIERS[item.supplier]?.[lang] || item.supplier}
+                           {SUPPLIERS.find(s => s.id === item.supplier)?.name || item.supplier}
                        </span>
                        {item.estimatedPrice > 0 && <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold">{item.estimatedPrice} €</span>}
                     </div>
