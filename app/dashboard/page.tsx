@@ -4,77 +4,58 @@ import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection, addDoc, onSnapshot, query, orderBy,
-  updateDoc, doc, serverTimestamp
+  updateDoc, deleteDoc, doc, serverTimestamp
 } from "firebase/firestore";
-import { Trash2, Check, ChefHat, UserCircle, FileText, Archive } from "lucide-react";
-import Link from "next/link";
+import { Trash2, Check, ChefHat, Euro, Wallet } from "lucide-react";
 
-// --- DİL VE ÇEVİRİ AYARLARI ---
+// --- DİL VE AYARLAR ---
 type LangCode = "tr" | "de" | "pa";
+
+// --- HAZIR KATALOG (Hızlı Seçim İçin) ---
+const CATALOG: Record<string, { tr: string; de: string; pa: string; defaultPrice?: number }[]> = {
+  veg: [
+    { tr: "Domates", de: "Tomaten", pa: "ਟਮਾਟਰ", defaultPrice: 2.5 },
+    { tr: "Soğan", de: "Zwiebeln", pa: "ਪਿਆਜ਼", defaultPrice: 1.2 },
+    { tr: "Patates", de: "Kartoffeln", pa: "ਆਲੂ", defaultPrice: 1.5 },
+    { tr: "Biber", de: "Paprika", pa: "ਸ਼ਿਮਲਾ ਮਿਰਚ", defaultPrice: 3.0 },
+  ],
+  meat: [
+    { tr: "Kıyma", de: "Hackfleisch", pa: "ਕੀਮਾ", defaultPrice: 12.0 },
+    { tr: "Tavuk", de: "Hähnchen", pa: "ਚਿਕਨ", defaultPrice: 8.5 },
+    { tr: "Sucuk", de: "Wurst", pa: "ਲੰਗੂਚਾ", defaultPrice: 15.0 },
+  ],
+  metro: [
+    { tr: "Yağ", de: "Öl", pa: "ਤੇਲ", defaultPrice: 25.0 },
+    { tr: "Un", de: "Mehl", pa: "ਆਟਾ", defaultPrice: 14.0 },
+    { tr: "Pirinç", de: "Reis", pa: "ਚਾਵਲ", defaultPrice: 18.0 },
+  ],
+  drink: [
+    { tr: "Kola", de: "Cola", pa: "ਕੋਲਾ", defaultPrice: 22.0 },
+    { tr: "Bira", de: "Bier", pa: "ਬੀਅਰ", defaultPrice: 28.0 },
+  ]
+};
 
 const DICTIONARY = {
   tr: {
-    title: "Pastillo Mutfak",
-    reports: "Raporlar",
-    placeholder: "Ürün adı... (Örn: Domates)",
-    loading: "Yükleniyor...",
-    empty: "Liste boş. Mutfakta her şey tamam mı?",
-    who_ask: "Kim istiyor?",
-    role_chef: "Şef",
-    role_bar: "Bar",
-    role_kitchen: "Mutfak",
-    unit_kg: "Kg",
-    unit_pcs: "Adet",
-    unit_box: "Kasa",
-    unit_pack: "Paket",
-    unit_bag: "Çuval",
-    cat_metro: "Metro",
-    cat_veg: "Sebze",
-    cat_meat: "Kasap",
-    cat_drink: "İçecek",
-    cat_other: "Diğer",
+    title: "Pastillo Mutfak", placeholder: "Ürün adı...",
+    role_chef: "Şef", role_bar: "Bar", role_kitchen: "Mutfak",
+    unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
+    cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
+    total_est: "Tahmini Tutar"
   },
   de: {
-    title: "Pastillo Küche",
-    reports: "Berichte",
-    placeholder: "Produktname... (z.B. Tomaten)",
-    loading: "Laden...",
-    empty: "Liste ist leer. Alles da?",
-    who_ask: "Wer bestellt?",
-    role_chef: "Chef",
-    role_bar: "Bar",
-    role_kitchen: "Küche",
-    unit_kg: "Kg",
-    unit_pcs: "Stück",
-    unit_box: "Kiste",
-    unit_pack: "Packung",
-    unit_bag: "Sack",
-    cat_metro: "Metro",
-    cat_veg: "Gemüse",
-    cat_meat: "Fleisch",
-    cat_drink: "Getränke",
-    cat_other: "Andere",
+    title: "Pastillo Küche", placeholder: "Produktname...",
+    role_chef: "Chef", role_bar: "Bar", role_kitchen: "Küche",
+    unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
+    cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
+    total_est: "Geschätzte Summe"
   },
   pa: {
-    title: "ਪਾਸਟਿਲੋ ਰਸੋਈ",
-    reports: "ਰਿਪੋਰਟਾਂ",
-    placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
-    loading: "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
-    empty: "ਸੂਚੀ ਖਾਲੀ ਹੈ। ਸਭ ਕੁਝ ਠੀਕ ਹੈ?",
-    who_ask: "ਕੌਣ ਮੰਗ ਰਿਹਾ ਹੈ?",
-    role_chef: "ਸ਼ੈੱਫ",
-    role_bar: "ਬਾਰ",
-    role_kitchen: "ਰਸੋਈ",
-    unit_kg: "ਕਿਲੋ",
-    unit_pcs: "ਟੁਕੜਾ",
-    unit_box: "ਬਾਕਸ",
-    unit_pack: "ਪੈਕਟ",
-    unit_bag: "ਬੋਰੀ",
-    cat_metro: "ਮੈਟਰੋ",
-    cat_veg: "ਸਬਜ਼ੀ",
-    cat_meat: "ਮੀਟ",
-    cat_drink: "ਪੀਣ ਵਾਲੇ",
-    cat_other: "ਹੋਰ",
+    title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
+    role_chef: "ਸ਼ੈੱਫ", role_bar: "ਬਾਰ", role_kitchen: "ਰਸੋਈ",
+    unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
+    cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
+    total_est: "ਕੁੱਲ ਅਨੁਮਾਨ"
   }
 };
 
@@ -89,302 +70,196 @@ export default function Dashboard() {
   const [unit, setUnit] = useState("kg");
   const [requester, setRequester] = useState("chef");
 
-  // Data State
-  const [items, setItems] = useState<any[]>([]); // TÜM ÜRÜNLER (Arşiv dahil)
-  const [loading, setLoading] = useState(true);
+  // 💰 YENİ: Fiyat State'i
+  const [price, setPrice] = useState("");
 
-  // Firestore Dinleme (Tüm ürünler - arşiv dahil)
+  const [preSelected, setPreSelected] = useState<any>(null);
+
+  // Data State
+  const [items, setItems] = useState<any[]>([]);
+
   useEffect(() => {
     const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // 1. GÖRÜNECEK LİSTE (Sadece Arşivlenmemişler)
-  const visibleItems = useMemo(() =>
-    items.filter(item => !item.isArchived),
-    [items]
-  );
+  const visibleItems = items.filter(item => !item.isArchived);
 
-  // 2. ÖNERİ LİSTESİ (Tüm geçmiş ürünlerden benzersiz isimler)
-  const suggestions = useMemo(() => {
-    const names = new Set<string>();
-    items.forEach(item => {
-        if(item.originalName) names.add(item.originalName);
-        if(item.names?.[lang]) names.add(item.names[lang]);
-    });
-    return Array.from(names).slice(0, 20); // İlk 20 öneri
-  }, [items, lang]);
+  // 💰 YENİ: Toplam Tutar Hesaplama (Sadece alınmamışlar veya hepsi)
+  const totalCost = useMemo(() => {
+    return visibleItems.reduce((acc, item) => acc + (Number(item.estimatedPrice) || 0), 0);
+  }, [visibleItems]);
 
-  // Hızlı Ekleme Fonksiyonu (Kilitsiz - Non-Blocking)
+  const selectFromCatalog = (item: any) => {
+    setNewItem(item[lang]);
+    setPreSelected(item);
+    // 💰 Eğer katalogda varsayılan fiyat varsa onu da getir
+    if(item.defaultPrice) setPrice(item.defaultPrice.toString());
+  };
+
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Kilit kontrolünü kaldırdık - Tam Non-Blocking!
     if (!newItem.trim()) return;
 
-    // 1. Değerleri hafızaya al
     const itemToAdd = newItem;
+    const names = preSelected ? preSelected : { tr: itemToAdd, de: itemToAdd, pa: itemToAdd };
     const currentData = {
-        lang,
-        cat: category,
-        amt: amount,
-        unit: unit,
-        req: requester
+        lang, cat: category, amt: amount, unit: unit, req: requester, isPre: !!preSelected,
+        price: parseFloat(price) || 0 // 💰 Fiyatı sayıya çevir
     };
 
-    // 2. ARAYÜZÜ ANINDA BOŞALT (Kullanıcı hemen yenisini yazabilsin)
-    setNewItem("");
-    // İstersen miktarı 1'e çek: setAmount("1");
+    // Temizlik
+    setNewItem(""); setPrice(""); setPreSelected(null);
 
-    try {
-      // 3. Veritabanı işlemini başlat (Ama bekleme, kullanıcı devam etsin)
-      addDoc(collection(db, "products"), {
-        originalName: itemToAdd,
-        inputLang: currentData.lang,
-        names: { tr: itemToAdd, de: itemToAdd, pa: itemToAdd },
-        category: currentData.cat,
-        amount: currentData.amt,
-        unit: currentData.unit,
-        requester: currentData.req,
-        isBought: false,
-        isArchived: false,
-        createdAt: serverTimestamp(),
-        boughtAt: null,
-        isTranslating: true
-      }).then((docRef) => {
-          // 4. Kayıt başarılı olunca arka planda çeviriyi başlat
-          fetch('/api/translate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productName: itemToAdd, inputLang: currentData.lang })
-          })
-          .then(res => res.json())
-          .then(data => {
-              if (data.success) {
-                updateDoc(doc(db, "products", docRef.id), {
-                    names: data.translations,
-                    isTranslating: false
-                });
-              }
-          })
-          .catch(err => console.error("Çeviri hatası:", err));
-      });
-
-    } catch (error) {
-      console.error("Hata:", error);
-      alert("Bir hata oldu, son eklediğin gitmemiş olabilir.");
-    }
+    // Veritabanına Ekle
+    addDoc(collection(db, "products"), {
+      originalName: itemToAdd,
+      names: names,
+      category: currentData.cat,
+      amount: currentData.amt,
+      unit: currentData.unit,
+      requester: currentData.req,
+      estimatedPrice: currentData.price, // 💰 Kayıt
+      isBought: false, isArchived: false,
+      createdAt: serverTimestamp(), boughtAt: null,
+      isTranslating: !currentData.isPre
+    }).then((docRef) => {
+        if (!currentData.isPre) {
+           // Çeviri API'si (Önbellekli)
+           fetch('/api/translate', {
+                method: 'POST',
+                body: JSON.stringify({ productName: itemToAdd, inputLang: currentData.lang })
+            })
+            .then(res => res.json())
+            .then(translatedNames => {
+                updateDoc(doc(db, "products", docRef.id), { names: translatedNames, isTranslating: false });
+            });
+        }
+    });
   };
 
-  // İŞLEM: Satın Alındı İşaretle
   const toggleItem = async (id: string, currentStatus: boolean) => {
-    await updateDoc(doc(db, "products", id), {
-      isBought: !currentStatus,
-      boughtAt: !currentStatus ? serverTimestamp() : null
-    });
+    await updateDoc(doc(db, "products", id), { isBought: !currentStatus, boughtAt: !currentStatus ? serverTimestamp() : null });
   };
 
-  // İŞLEM: Arşivle (Silme Yerine)
   const archiveItem = async (id: string) => {
-    // Veriyi silmiyoruz, sadece 'isArchived: true' yapıp ekrandan gizliyoruz
-    await updateDoc(doc(db, "products", id), {
-      isArchived: true,
-      archivedAt: serverTimestamp()
-    });
+    await updateDoc(doc(db, "products", id), { isArchived: true });
   };
 
   return (
-    <div className={`min-h-screen bg-gray-50 p-4 ${lang === 'pa' ? 'font-gurmukhi' : ''}`}>
-      <div className="max-w-xl mx-auto space-y-6">
+    <div className={`min-h-screen bg-gray-50 p-2 sm:p-4 ${lang === 'pa' ? 'font-gurmukhi' : ''}`}>
+      <div className="max-w-xl mx-auto space-y-4">
 
-        {/* ÜST BAR */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-          <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ChefHat className="text-orange-600" />
-            {t.title}
-          </h1>
-
-          <div className="flex items-center gap-3">
-            {/* Raporlar Butonu */}
-            <Link href="/reports">
-              <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                <FileText className="w-4 h-4" />
-                {t.reports}
-              </button>
-            </Link>
-
-            {/* Dil Seçici */}
-            <div className="flex gap-2 bg-gray-800 rounded-lg p-1 border border-gray-700">
-            {(["tr", "de", "pa"] as LangCode[]).map((l) => (
-              <button
-                key={l}
-                onClick={() => setLang(l)}
-                className={`px-4 py-2 rounded-md font-bold transition-all ${
-                  lang === l
-                    ? "bg-orange-600 text-white shadow-lg scale-105"
-                    : "bg-gray-700 text-gray-200 hover:bg-gray-600 hover:text-white"
-                }`}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          </div>
-        </div>
-
-        {/* EKLEME FORMU */}
-        <div className="bg-white p-5 rounded-xl shadow-lg border-t-4 border-orange-500">
-          <form onSubmit={addItem} className="space-y-4">
-
-            {/* Personel Seçimi */}
-            <div className="flex items-center gap-2 bg-blue-50 p-2 rounded-lg">
-                <UserCircle className="text-blue-500" />
-                <span className="text-sm font-bold text-blue-700">{t.who_ask}:</span>
-                <div className="flex gap-2">
-                    {['chef', 'bar', 'kitchen'].map((role) => (
-                        <button
-                            key={role}
-                            type="button"
-                            onClick={() => setRequester(role)}
-                            className={`px-3 py-1 rounded-md text-sm ${requester === role ? 'bg-blue-500 text-white shadow' : 'bg-white text-gray-600 border'}`}
-                        >
-                            {t[`role_${role}` as keyof typeof t]}
-                        </button>
+        {/* ÜST BAR ve CANLI BÜTÇE 💰 */}
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+                <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <ChefHat className="text-orange-600 w-6 h-6" />
+                    {t.title}
+                </h1>
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                    {(["tr", "de", "pa"] as LangCode[]).map((l) => (
+                    <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
+                        {l.toUpperCase()}
+                    </button>
                     ))}
                 </div>
             </div>
+            {/* TOPLAM TUTAR GÖSTERGESİ */}
+            <div className="bg-green-50 border border-green-100 p-2 rounded-lg flex justify-between items-center">
+                <div className="flex items-center gap-2 text-green-700">
+                    <Wallet className="w-5 h-5" />
+                    <span className="text-sm font-bold">{t.total_est}:</span>
+                </div>
+                <span className="text-lg font-black text-green-700">{totalCost.toFixed(2)} €</span>
+            </div>
+        </div>
 
+        {/* ANA FORM */}
+        <div className="bg-white rounded-xl shadow-lg border-t-4 border-orange-500 overflow-hidden">
             {/* Kategori Seçimi */}
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {[
-                { id: "metro", icon: "🛒" },
-                { id: "veg", icon: "🥦" },
-                { id: "meat", icon: "🥩" },
-                { id: "drink", icon: "🥤" },
-                { id: "other", icon: "⚡" },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategory(cat.id)}
+            <div className="flex gap-2 overflow-x-auto p-3 bg-gray-50 border-b scrollbar-hide">
+              {[{ id: "veg", icon: "🥦" }, { id: "meat", icon: "🥩" }, { id: "metro", icon: "🛒" }, { id: "drink", icon: "🥤" }]
+              .map((cat) => (
+                <button key={cat.id} type="button" onClick={() => setCategory(cat.id)}
                   className={`flex items-center gap-1 px-3 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-all ${
-                    category === cat.id ? "bg-orange-600 text-white scale-105" : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  <span>{cat.icon}</span>
-                  <span className="capitalize">{t[`cat_${cat.id}` as keyof typeof t]}</span>
+                    category === cat.id ? "bg-orange-600 text-white" : "bg-white text-gray-600 border"
+                  }`}>
+                  <span>{cat.icon}</span> <span className="capitalize">{t[`cat_${cat.id}` as keyof typeof t]}</span>
                 </button>
               ))}
             </div>
 
-            {/* Ürün Adı Input (Autocomplete ile) */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                placeholder={t.placeholder}
-                list="product-suggestions"
-                className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg text-black"
-              />
-              {/* Datalist ile öneri sistemi */}
-              <datalist id="product-suggestions">
-                {suggestions.map((suggestion, idx) => (
-                  <option key={idx} value={suggestion} />
+            {/* Hızlı Seçim */}
+            <div className="p-3 bg-blue-50/50 flex flex-wrap gap-2">
+                {CATALOG[category as keyof typeof CATALOG]?.map((item, idx) => (
+                    <button key={idx} onClick={() => selectFromCatalog(item)} className="bg-white border border-blue-100 text-gray-700 px-3 py-1 rounded-lg text-sm shadow-sm active:scale-95">
+                        {item[lang]}
+                    </button>
                 ))}
-              </datalist>
             </div>
 
-            {/* Miktar ve Birim */}
-            <div className="flex gap-2">
-               <input
-                 type="number"
-                 value={amount}
-                 onChange={(e) => setAmount(e.target.value)}
-                 className="w-20 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black"
-                 min="1"
-               />
-               <select
-                 value={unit}
-                 onChange={(e) => setUnit(e.target.value)}
-                 className="flex-1 p-3 bg-gray-50 border rounded-xl text-black"
-               >
-                 {['kg', 'pcs', 'box', 'pack', 'bag'].map(u =>
-                   <option key={u} value={u}>{t[`unit_${u}` as keyof typeof t]}</option>
-                 )}
-               </select>
-               <button
-                 type="submit"
-                 disabled={!newItem.trim()}
-                 className="bg-green-600 text-white px-6 rounded-xl font-bold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-               >
-                 +
-               </button>
-            </div>
-          </form>
+            <form onSubmit={addItem} className="p-4 space-y-4">
+                <input type="text" value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder={t.placeholder} className="w-full p-3 bg-gray-50 border rounded-xl text-lg text-black" />
+
+                <div className="flex items-center gap-2">
+                    {/* Miktar */}
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-16 p-3 bg-gray-50 border rounded-xl text-center font-bold text-black" />
+
+                    {/* Birim */}
+                    <select value={unit} onChange={(e) => setUnit(e.target.value)} className="w-20 p-3 bg-gray-50 border rounded-xl text-black text-sm">
+                        {['kg', 'pcs', 'box', 'pack'].map(u => <option key={u} value={u}>{t[`unit_${u}` as keyof typeof t]}</option>)}
+                    </select>
+
+                    {/* 💰 FİYAT GİRİŞİ */}
+                    <div className="relative flex-1">
+                        <input
+                            type="number"
+                            step="0.5"
+                            placeholder="0 €"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            className="w-full p-3 pl-8 bg-green-50 border border-green-200 rounded-xl text-green-800 font-bold placeholder-green-300"
+                        />
+                        <Euro className="w-4 h-4 text-green-600 absolute left-2.5 top-3.5" />
+                    </div>
+
+                    <button type="submit" className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl shadow-md">+</button>
+                </div>
+            </form>
         </div>
 
-        {/* ÜRÜN LİSTESİ */}
-        <div className="space-y-3 pb-10">
-          {loading ? (
-            <div className="text-center text-gray-400 py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-              {t.loading}
-            </div>
-          ) : visibleItems.length === 0 ? (
-            <div className="text-center text-gray-400 py-12">
-              <ChefHat className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              {t.empty}
-            </div>
-          ) : (
-            visibleItems.map((item) => (
-              <div
-                key={item.id}
-                className={`group flex items-center justify-between p-4 rounded-xl border transition-all ${
-                  item.isBought ? "bg-gray-100 border-gray-200 opacity-60" : "bg-white border-gray-200 shadow-sm"
-                }`}
-              >
-                {/* Checkbox */}
-                <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-4 flex-1 cursor-pointer">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    item.isBought ? "bg-green-500 border-green-500" : "border-gray-300 group-hover:border-orange-500"
-                  }`}>
-                    {item.isBought && <Check className="w-4 h-4 text-white" />}
+        {/* LİSTE */}
+        <div className="space-y-2 pb-20">
+            {visibleItems.map((item) => (
+              <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border ${item.isBought ? "bg-gray-100" : "bg-white shadow-sm"}`}>
+                <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-3 flex-1 cursor-pointer">
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${item.isBought ? "bg-green-500 border-green-500" : "border-gray-300"}`}>
+                    {item.isBought && <Check className="w-3 h-3 text-white" />}
                   </div>
-
-                  {/* Ürün Bilgisi */}
                   <div>
-                    <h3 className={`text-lg font-medium ${item.isBought ? "line-through text-gray-500" : "text-gray-900"}`}>
+                    <h3 className={`font-medium ${item.isBought ? "line-through text-gray-400" : "text-gray-800"}`}>
                       {item.names?.[lang] || item.originalName}
-                      {/* Çeviriliyor göstergesi */}
-                      {item.isTranslating && <span className="text-xs text-orange-500 ml-2 animate-pulse">(Çeviriliyor...)</span>}
                     </h3>
-                    <p className="text-xs text-gray-400 flex gap-2 items-center mt-1">
-                       <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold uppercase text-[10px]">
-                         {t[`role_${item.requester || 'chef'}` as keyof typeof t]}
-                       </span>
-                       <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600 font-bold">
-                         {item.amount} {t[`unit_${item.unit}` as keyof typeof t]}
-                       </span>
-                       <span className="uppercase tracking-wider">{t[`cat_${item.category}` as keyof typeof t]}</span>
-                    </p>
+                    <div className="text-[11px] text-gray-500 flex gap-2 items-center">
+                       <span className="font-bold text-blue-600 uppercase">{item.requester}</span>
+                       <span>•</span>
+                       <span>{item.amount} {item.unit}</span>
+                       {/* 💰 Fiyat Gösterimi */}
+                       {item.estimatedPrice > 0 && (
+                           <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold flex items-center">
+                               {item.estimatedPrice} €
+                           </span>
+                       )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Arşivle Butonu */}
-                <button
-                  onClick={() => archiveItem(item.id)}
-                  className="p-2 text-gray-300 hover:text-orange-500 transition-colors"
-                  title="Arşivle"
-                >
-                  <Archive className="w-5 h-5" />
-                </button>
+                <button onClick={() => archiveItem(item.id)} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
               </div>
-            ))
-          )}
+            ))}
         </div>
       </div>
     </div>
