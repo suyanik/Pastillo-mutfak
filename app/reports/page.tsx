@@ -26,6 +26,7 @@ const DICTIONARY = {
     category: "Kategori",
     amount: "Miktar",
     status: "Durum",
+    product: "Ürün",
     role_chef: "Şef",
     role_bar: "Bar",
     role_kitchen: "Mutfak",
@@ -57,6 +58,7 @@ const DICTIONARY = {
     category: "Kategorie",
     amount: "Menge",
     status: "Status",
+    product: "Produkt",
     role_chef: "Chef",
     role_bar: "Bar",
     role_kitchen: "Küche",
@@ -88,6 +90,7 @@ const DICTIONARY = {
     category: "ਸ਼੍ਰੇਣੀ",
     amount: "ਮਾਤਰਾ",
     status: "ਸਥਿਤੀ",
+    product: "ਉਤਪਾਦ",
     role_chef: "ਸ਼ੈੱਫ",
     role_bar: "ਬਾਰ",
     role_kitchen: "ਰਸੋਈ",
@@ -288,7 +291,7 @@ export default function Reports() {
                 <thead className="bg-gray-50 border-b-2 border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">{t.status}</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">Ürün</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">{t.product}</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">{t.category}</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">{t.amount}</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">{t.requestedBy}</th>

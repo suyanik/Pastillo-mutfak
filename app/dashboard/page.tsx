@@ -11,13 +11,13 @@ import Link from "next/link";
 
 type LangCode = "tr" | "de" | "pa";
 
-const SUPPLIERS = [
-  { id: "metro", name: "Metro" },
-  { id: "hal", name: "Hal (Sebze)" },
-  { id: "kasap", name: "Kasap" },
-  { id: "drink", name: "İçecekçi" },
-  { id: "other", name: "Diğer" }
-];
+const SUPPLIERS: Record<string, { tr: string; de: string; pa: string }> = {
+  metro: { tr: "Metro", de: "Metro", pa: "ਮੈਟਰੋ" },
+  hal: { tr: "Hal (Sebze)", de: "Markt (Gemüse)", pa: "ਮੰਡੀ (ਸਬਜ਼ੀ)" },
+  kasap: { tr: "Kasap", de: "Metzger", pa: "ਕਸਾਈ" },
+  drink: { tr: "İçecekçi", de: "Getränkehändler", pa: "ਪੀਣ ਵਾਲੇ ਵੇਚਣ ਵਾਲਾ" },
+  other: { tr: "Diğer", de: "Andere", pa: "ਹੋਰ" }
+};
 
 // Varsayılan Katalog (Sistem boşsa bunlar yüklenecek)
 const DEFAULT_CATALOG = [
@@ -33,21 +33,27 @@ const DICTIONARY = {
     unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
     save_catalog: "Bunu rafa kaydet (Buton yap)", edit_mode: "Düzenle", quick_select: "Raf Seçimi",
-    add_btn: "LİSTEYE EKLE", reports: "Raporlar"
+    add_btn: "LİSTEYE EKLE", reports: "Raporlar", done: "Bitti",
+    empty_shelf: "Bu rafta ürün yok.", empty_shelf_hint: "Aşağıdan ekleyip \"Kaydet\"e bas.",
+    confirm_delete: "Bu kartı raftan kaldırmak istiyor musun?"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Neues Produkt...",
     unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
     save_catalog: "Im Regal speichern", edit_mode: "Bearbeiten", quick_select: "Regal",
-    add_btn: "HINZUFÜGEN", reports: "Berichte"
+    add_btn: "HINZUFÜGEN", reports: "Berichte", done: "Fertig",
+    empty_shelf: "Keine Produkte im Regal.", empty_shelf_hint: "Unten hinzufügen und \"Speichern\" drücken.",
+    confirm_delete: "Möchten Sie diese Karte aus dem Regal entfernen?"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਨਵਾਂ ਉਤਪਾਦ...",
     unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
     save_catalog: "ਸ਼ੈਲਫ 'ਤੇ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਸੰਪਾਦਿਤ ਕਰੋ", quick_select: "ਸ਼ੈਲਫ",
-    add_btn: "ਜੋੜੋ", reports: "ਰਿਪੋਰਟਾਂ"
+    add_btn: "ਜੋੜੋ", reports: "ਰਿਪੋਰਟਾਂ", done: "ਹੋ ਗਿਆ",
+    empty_shelf: "ਇਸ ਸ਼ੈਲਫ ਵਿੱਚ ਕੋਈ ਉਤਪਾਦ ਨਹੀਂ।", empty_shelf_hint: "ਹੇਠਾਂ ਤੋਂ ਜੋੜੋ ਅਤੇ \"ਸੁਰੱਖਿਅਤ\" ਦਬਾਓ।",
+    confirm_delete: "ਕੀ ਤੁਸੀਂ ਇਸ ਕਾਰਡ ਨੂੰ ਸ਼ੈਲਫ ਤੋਂ ਹਟਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?"
   }
 };
 
@@ -105,11 +111,14 @@ export default function Dashboard() {
   }, [visibleItems]);
 
   const sendToWhatsapp = (supplierId: string) => {
-    const supplierName = SUPPLIERS.find(s => s.id === supplierId)?.name || supplierId;
+    const supplierName = SUPPLIERS[supplierId]?.[lang] || supplierId;
     const productList = itemsBySupplier[supplierId];
     if(!productList?.length) return;
     let message = `🛒 *Pastillo - ${supplierName}*\n\n`;
-    productList.forEach(item => message += `- ${item.amount} ${item.unit} ${item.names?.[lang] || item.originalName}\n`);
+    productList.forEach(item => {
+      const unitText = t[`unit_${item.unit}` as keyof typeof t] || item.unit;
+      message += `- ${item.amount} ${unitText} ${item.names?.[lang] || item.originalName}\n`;
+    });
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -124,7 +133,7 @@ export default function Dashboard() {
   };
 
   const deleteFromCatalog = async (id: string) => {
-      if(confirm("Bu kartı raftan kaldırmak istiyor musun?")) await deleteDoc(doc(db, "catalog", id));
+      if(confirm(t.confirm_delete)) await deleteDoc(doc(db, "catalog", id));
   };
 
   const addItem = async (e: React.FormEvent) => {
@@ -206,7 +215,7 @@ export default function Dashboard() {
                     <button key={supId} onClick={() => sendToWhatsapp(supId)}
                         className="bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-1 text-xs font-bold shadow-sm whitespace-nowrap active:scale-95 transition-transform hover:bg-green-700">
                         <Send className="w-3 h-3" />
-                        {SUPPLIERS.find(s => s.id === supId)?.name} ({itemsBySupplier[supId].length})
+                        {SUPPLIERS[supId]?.[lang] || supId} ({itemsBySupplier[supId].length})
                     </button>
                 ))}
             </div>
@@ -242,7 +251,7 @@ export default function Dashboard() {
                         {t.quick_select} ({currentCatalog.length})
                     </span>
                     <button onClick={() => setIsEditMode(!isEditMode)} className={`text-xs flex items-center gap-1 px-2 py-1 rounded border transition-colors ${isEditMode ? 'bg-red-100 text-red-600 border-red-200 font-bold' : 'bg-white text-gray-400 hover:text-gray-600'}`}>
-                        {isEditMode ? 'Bitti' : <Edit className="w-3 h-3" />}
+                        {isEditMode ? t.done : <Edit className="w-3 h-3" />}
                     </button>
                 </div>
 
@@ -259,7 +268,7 @@ export default function Dashboard() {
                             {/* Alt Bilgi (Tedarikçi ve Fiyat) */}
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded capitalize">
-                                    {SUPPLIERS.find(s => s.id === item.defaultSupplier)?.name || 'Hal'}
+                                    {SUPPLIERS[item.defaultSupplier]?.[lang] || SUPPLIERS.hal[lang]}
                                 </span>
                                 {item.defaultPrice > 0 && (
                                     <span className="text-[10px] font-bold text-green-700">{item.defaultPrice}€</span>
@@ -279,7 +288,7 @@ export default function Dashboard() {
                     {/* Boş İse Uyarı */}
                     {currentCatalog.length === 0 && (
                         <div className="col-span-2 text-center py-6 text-gray-400 text-xs border-2 border-dashed border-gray-200 rounded-xl">
-                            Bu rafta ürün yok.<br/>Aşağıdan ekleyip "Kaydet"e bas.
+                            {t.empty_shelf}<br/>{t.empty_shelf_hint}
                         </div>
                     )}
                 </div>
@@ -310,7 +319,7 @@ export default function Dashboard() {
                             <span className="absolute left-2 top-3 text-green-600">€</span>
                         </div>
                         <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="flex-1 p-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs font-bold">
-                            {SUPPLIERS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {Object.keys(SUPPLIERS).map(supId => <option key={supId} value={supId}>{SUPPLIERS[supId][lang]}</option>)}
                         </select>
                     </div>
                 </div>
@@ -353,10 +362,10 @@ export default function Dashboard() {
                       {item.names?.[lang] || item.originalName}
                     </h3>
                     <div className="text-[11px] text-gray-500 flex flex-wrap gap-2 items-center mt-1">
-                       <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{item.amount} {item.unit}</span>
+                       <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{item.amount} {t[`unit_${item.unit}` as keyof typeof t] || item.unit}</span>
                        <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
                            <Truck className="w-3 h-3" />
-                           {SUPPLIERS.find(s => s.id === item.supplier)?.name || item.supplier}
+                           {SUPPLIERS[item.supplier]?.[lang] || item.supplier}
                        </span>
                        {item.estimatedPrice > 0 && <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold">{item.estimatedPrice} €</span>}
                     </div>
