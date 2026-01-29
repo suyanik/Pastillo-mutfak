@@ -6,7 +6,8 @@ import {
   collection, addDoc, onSnapshot, query, orderBy,
   updateDoc, deleteDoc, doc, serverTimestamp, getDocs
 } from "firebase/firestore";
-import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X } from "lucide-react";
+import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
 
 type LangCode = "tr" | "de" | "pa";
 
@@ -31,19 +32,22 @@ const DICTIONARY = {
     title: "Pastillo Mutfak", placeholder: "Ürün adı...",
     unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
-    total_est: "Tahmini", save_catalog: "Kataloğa Kaydet", edit_mode: "Butonları Düzenle"
+    total_est: "Tahmini", save_catalog: "Kataloğa Kaydet", edit_mode: "Butonları Düzenle",
+    reports: "Raporlar", completed: "Tamamlananlar", show: "Göster", hide: "Gizle"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Produktname...",
     unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
-    total_est: "Summe", save_catalog: "In Katalog speichern", edit_mode: "Buttons bearbeiten"
+    total_est: "Summe", save_catalog: "In Katalog speichern", edit_mode: "Buttons bearbeiten",
+    reports: "Berichte", completed: "Fertig", show: "Zeigen", hide: "Verstecken"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
     unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
-    total_est: "ਕੁੱਲ", save_catalog: "ਕੈਟਾਲਾਗ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਬਟਨ ਸੰਪਾਦਿਤ ਕਰੋ"
+    total_est: "ਕੁੱਲ", save_catalog: "ਕੈਟਾਲਾਗ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਬਟਨ ਸੰਪਾਦਿਤ ਕਰੋ",
+    reports: "ਰਿਪੋਰਟਾਂ", completed: "ਪੂਰਾ ਹੋਇਆ", show: "ਦਿਖਾਓ", hide: "ਲੁਕਾਓ"
   }
 };
 
@@ -63,6 +67,7 @@ export default function Dashboard() {
   // ✨ YENİ: Kataloğa Kaydetme ve Düzenleme Modu
   const [saveToCatalog, setSaveToCatalog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showBought, setShowBought] = useState(false); // A2: Satın alınanları göster/gizle
 
   const [preSelected, setPreSelected] = useState<any>(null);
 
@@ -212,12 +217,22 @@ export default function Dashboard() {
               <ChefHat className="text-orange-600 w-6 h-6" />
               {t.title}
             </h1>
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-              {(["tr", "de", "pa"] as LangCode[]).map((l) => (
-                <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
-                  {l.toUpperCase()}
+            <div className="flex items-center gap-2">
+              {/* A1: Raporlar Butonu */}
+              <Link href="/reports">
+                <button className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors">
+                  <FileText className="w-3 h-3" />
+                  {t.reports}
                 </button>
-              ))}
+              </Link>
+              {/* Dil Seçici */}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                {(["tr", "de", "pa"] as LangCode[]).map((l) => (
+                  <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
+                    {l.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -323,30 +338,70 @@ export default function Dashboard() {
         </div>
 
         {/* LİSTE */}
-        <div className="space-y-2 pb-24">
-          {visibleItems.map((item) => (
-            <div key={item.id} className={`flex items-center justify-between p-3 rounded-xl border ${item.isBought ? "bg-gray-100" : "bg-white shadow-sm border-l-4 border-l-orange-400"}`}>
-              <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-3 flex-1 cursor-pointer">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${item.isBought ? "bg-green-500 border-green-500" : "border-gray-300"}`}>
-                  {item.isBought && <Check className="w-3 h-3 text-white" />}
-                </div>
-                <div>
-                  <h3 className={`font-medium ${item.isBought ? "line-through text-gray-400" : "text-gray-800"}`}>
-                    {item.names?.[lang] || item.originalName}
-                  </h3>
-                  <div className="text-[11px] text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">
-                    <span className="font-bold text-gray-700">{item.amount} {item.unit}</span>
-                    <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
-                      <Truck className="w-3 h-3" />
-                      {SUPPLIERS.find(s => s.id === item.supplier)?.name || item.supplier}
-                    </span>
-                    {item.estimatedPrice > 0 && <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold">{item.estimatedPrice} €</span>}
+        <div className="space-y-4 pb-24">
+          {/* ALINMAMIŞ ÜRÜNLER */}
+          <div className="space-y-2">
+            {visibleItems.filter(i => !i.isBought).map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border bg-white shadow-sm border-l-4 border-l-orange-400">
+                <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-3 flex-1 cursor-pointer">
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center border-gray-300">
+                    {item.isBought && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-800">
+                      {item.names?.[lang] || item.originalName}
+                    </h3>
+                    <div className="text-[11px] text-gray-500 flex flex-wrap gap-2 items-center mt-0.5">
+                      <span className="font-bold text-gray-700">{item.amount} {item.unit}</span>
+                      <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
+                        <Truck className="w-3 h-3" />
+                        {SUPPLIERS.find(s => s.id === item.supplier)?.name || item.supplier}
+                      </span>
+                      {item.estimatedPrice > 0 && <span className="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold">{item.estimatedPrice} €</span>}
+                    </div>
                   </div>
                 </div>
+                <button onClick={() => archiveItem(item.id)} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
               </div>
-              <button onClick={() => archiveItem(item.id)} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+            ))}
+          </div>
+
+          {/* A2: SATINALINMIŞ ÜRÜNLER (Toggle ile) */}
+          {visibleItems.filter(i => i.isBought).length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowBought(!showBought)}
+                className="flex items-center gap-2 text-sm font-bold text-gray-500 mb-2 hover:text-gray-700 transition-colors"
+              >
+                {showBought ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                ✓ {t.completed} ({visibleItems.filter(i => i.isBought).length})
+              </button>
+
+              {showBought && (
+                <div className="space-y-2">
+                  {visibleItems.filter(i => i.isBought).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border bg-gray-100 opacity-60">
+                      <div onClick={() => toggleItem(item.id, item.isBought)} className="flex items-center gap-3 flex-1 cursor-pointer">
+                        <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center bg-green-500 border-green-500">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium line-through text-gray-400">
+                            {item.names?.[lang] || item.originalName}
+                          </h3>
+                          <div className="text-[11px] text-gray-400 flex flex-wrap gap-2 items-center mt-0.5">
+                            <span className="font-bold">{item.amount} {item.unit}</span>
+                            {item.estimatedPrice > 0 && <span className="font-bold">{item.estimatedPrice} €</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => archiveItem(item.id)} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
