@@ -6,7 +6,8 @@ import {
   collection, addDoc, onSnapshot, query, orderBy,
   updateDoc, deleteDoc, doc, serverTimestamp
 } from "firebase/firestore";
-import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, LayoutGrid, PlusCircle } from "lucide-react";
+import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, LayoutGrid, PlusCircle, FileText } from "lucide-react";
+import Link from "next/link";
 
 type LangCode = "tr" | "de" | "pa";
 
@@ -32,21 +33,21 @@ const DICTIONARY = {
     unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
     save_catalog: "Bunu rafa kaydet (Buton yap)", edit_mode: "Düzenle", quick_select: "Raf Seçimi",
-    add_btn: "LİSTEYE EKLE"
+    add_btn: "LİSTEYE EKLE", reports: "Raporlar"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Neues Produkt...",
     unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
     save_catalog: "Im Regal speichern", edit_mode: "Bearbeiten", quick_select: "Regal",
-    add_btn: "HINZUFÜGEN"
+    add_btn: "HINZUFÜGEN", reports: "Berichte"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਨਵਾਂ ਉਤਪਾਦ...",
     unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
     save_catalog: "ਸ਼ੈਲਫ 'ਤੇ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਸੰਪਾਦਿਤ ਕਰੋ", quick_select: "ਸ਼ੈਲਫ",
-    add_btn: "ਜੋੜੋ"
+    add_btn: "ਜੋੜੋ", reports: "ਰਿਪੋਰਟਾਂ"
   }
 };
 
@@ -177,12 +178,22 @@ export default function Dashboard() {
                     <ChefHat className="text-orange-600 w-6 h-6" />
                     {t.title}
                 </h1>
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-                    {(["tr", "de", "pa"] as LangCode[]).map((l) => (
-                    <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
-                        {l.toUpperCase()}
-                    </button>
-                    ))}
+                <div className="flex items-center gap-2">
+                    {/* Raporlar Butonu */}
+                    <Link href="/reports">
+                        <button className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors">
+                            <FileText className="w-3 h-3" />
+                            {t.reports}
+                        </button>
+                    </Link>
+                    {/* Dil Seçici */}
+                    <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                        {(["tr", "de", "pa"] as LangCode[]).map((l) => (
+                        <button key={l} onClick={() => setLang(l)} className={`px-2 py-1 rounded font-bold text-xs ${lang === l ? "bg-white text-orange-600 shadow" : "text-gray-400"}`}>
+                            {l.toUpperCase()}
+                        </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
