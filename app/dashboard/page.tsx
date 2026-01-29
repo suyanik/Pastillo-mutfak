@@ -6,8 +6,9 @@ import {
   collection, addDoc, onSnapshot, query, orderBy,
   updateDoc, deleteDoc, doc, serverTimestamp, getDocs
 } from "firebase/firestore";
-import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, Check, ChefHat, Wallet, Truck, Send, Save, Edit, X, FileText, ChevronDown, ChevronUp, ScanLine } from "lucide-react";
 import Link from "next/link";
+import { Html5QrcodeScanner } from "html5-qrcode";
 
 type LangCode = "tr" | "de" | "pa";
 
@@ -33,21 +34,24 @@ const DICTIONARY = {
     unit_kg: "Kg", unit_pcs: "Adet", unit_box: "Kasa", unit_pack: "Paket",
     cat_metro: "Metro", cat_veg: "Sebze", cat_meat: "Kasap", cat_drink: "İçecek", cat_other: "Diğer",
     total_est: "Tahmini", save_catalog: "Kataloğa Kaydet", edit_mode: "Butonları Düzenle",
-    reports: "Raporlar", completed: "Tamamlananlar", show: "Göster", hide: "Gizle"
+    reports: "Raporlar", completed: "Tamamlananlar", show: "Göster", hide: "Gizle",
+    scan_barcode: "Barkod Tara", scanning: "Taranıyor...", scan_success: "Barkod bulundu!"
   },
   de: {
     title: "Pastillo Küche", placeholder: "Produktname...",
     unit_kg: "Kg", unit_pcs: "Stück", unit_box: "Kiste", unit_pack: "Packung",
     cat_metro: "Metro", cat_veg: "Gemüse", cat_meat: "Fleisch", cat_drink: "Getränke", cat_other: "Andere",
     total_est: "Summe", save_catalog: "In Katalog speichern", edit_mode: "Buttons bearbeiten",
-    reports: "Berichte", completed: "Fertig", show: "Zeigen", hide: "Verstecken"
+    reports: "Berichte", completed: "Fertig", show: "Zeigen", hide: "Verstecken",
+    scan_barcode: "Barcode scannen", scanning: "Scannt...", scan_success: "Barcode gefunden!"
   },
   pa: {
     title: "ਪਾਸਟਿਲੋ ਰਸੋਈ", placeholder: "ਉਤਪਾਦ ਦਾ ਨਾਮ...",
     unit_kg: "ਕਿਲੋ", unit_pcs: "ਟੁਕੜਾ", unit_box: "ਬਾਕਸ", unit_pack: "ਪੈਕਟ",
     cat_metro: "ਮੈਟਰੋ", cat_veg: "ਸਬਜ਼ੀ", cat_meat: "ਮੀਟ", cat_drink: "ਪੀਣ ਵਾਲੇ", cat_other: "ਹੋਰ",
     total_est: "ਕੁੱਲ", save_catalog: "ਕੈਟਾਲਾਗ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ", edit_mode: "ਬਟਨ ਸੰਪਾਦਿਤ ਕਰੋ",
-    reports: "ਰਿਪੋਰਟਾਂ", completed: "ਪੂਰਾ ਹੋਇਆ", show: "ਦਿਖਾਓ", hide: "ਲੁਕਾਓ"
+    reports: "ਰਿਪੋਰਟਾਂ", completed: "ਪੂਰਾ ਹੋਇਆ", show: "ਦਿਖਾਓ", hide: "ਲੁਕਾਓ",
+    scan_barcode: "ਬਾਰਕੋਡ ਸਕੈਨ ਕਰੋ", scanning: "ਸਕੈਨਿੰਗ...", scan_success: "ਬਾਰਕੋਡ ਮਿਲਿਆ!"
   }
 };
 
@@ -68,6 +72,7 @@ export default function Dashboard() {
   const [saveToCatalog, setSaveToCatalog] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showBought, setShowBought] = useState(false); // A2: Satın alınanları göster/gizle
+  const [isScannerOpen, setIsScannerOpen] = useState(false); // B1: Barkod Tarayıcı
 
   const [preSelected, setPreSelected] = useState<any>(null);
 
@@ -142,6 +147,54 @@ export default function Dashboard() {
       await deleteDoc(doc(db, "catalog", id));
     }
   };
+
+  // B1: Barkod Okuyucu
+  useEffect(() => {
+    if (!isScannerOpen) return;
+
+    const scanner = new Html5QrcodeScanner(
+      "barcode-reader",
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      false
+    );
+
+    scanner.render(
+      async (decodedText) => {
+        // Barkod okundu!
+        console.log("Barkod:", decodedText);
+
+        // Firebase'de bu barkodu ara
+        const barcodeQuery = query(
+          collection(db, "barcodes"),
+          orderBy("barcode", "asc")
+        );
+        const snapshot = await getDocs(barcodeQuery);
+        const barcodeData = snapshot.docs.find(doc => doc.data().barcode === decodedText);
+
+        if (barcodeData) {
+          // Barkod kayıtlı - Bilgileri doldur
+          const data = barcodeData.data();
+          setNewItem(data.productName || decodedText);
+          if (data.price) setPrice(data.price.toString());
+          if (data.supplier) setSupplier(data.supplier);
+          if (data.category) setCategory(data.category);
+        } else {
+          // Yeni barkod - Sadece barkodu göster
+          setNewItem(`Barkod: ${decodedText}`);
+        }
+
+        scanner.clear();
+        setIsScannerOpen(false);
+      },
+      (error) => {
+        // Hata mesajlarını görmezden gel (sürekli tarama yaparken normal)
+      }
+    );
+
+    return () => {
+      scanner.clear().catch(console.error);
+    };
+  }, [isScannerOpen]);
 
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,8 +346,18 @@ export default function Dashboard() {
           </div>
 
           <form onSubmit={addItem} className="p-4 space-y-3">
-            <input type="text" value={newItem} onChange={(e) => { setNewItem(e.target.value); setPreSelected(null); }}
-              placeholder={t.placeholder} className="w-full p-3 bg-gray-50 border rounded-xl text-lg text-black" />
+            {/* B1: Ürün Adı + Barkod Butonu */}
+            <div className="flex gap-2">
+              <input type="text" value={newItem} onChange={(e) => { setNewItem(e.target.value); setPreSelected(null); }}
+                placeholder={t.placeholder} className="flex-1 p-3 bg-gray-50 border rounded-xl text-lg text-black" />
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="flex items-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-colors"
+              >
+                <ScanLine className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="flex gap-2">
@@ -403,6 +466,32 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* B1: BARKOD TARAYICI MODAL */}
+        {isScannerOpen && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden">
+              <div className="bg-purple-600 p-4 flex justify-between items-center">
+                <h3 className="text-white font-bold flex items-center gap-2">
+                  <ScanLine className="w-5 h-5" />
+                  {t.scan_barcode}
+                </h3>
+                <button
+                  onClick={() => setIsScannerOpen(false)}
+                  className="text-white hover:bg-purple-700 rounded-full p-2 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4">
+                <div id="barcode-reader" className="w-full"></div>
+                <p className="text-sm text-gray-500 mt-3 text-center">
+                  {t.scanning}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
